@@ -609,7 +609,249 @@ How many non blocking threads per process(jvm)?
 2.Process events which dispatched from the kernal
 .....................................................................................
  		  Reactive Programming using Muntiny
-......................................................................................
+.....................................................................................
+Reactive programming is programming style to build distirbuted apps using event driven style.
+
+Reactive programming can be implemented in any language.
+
+Java and Reactive Programming;
+...............................
+
+1.RxJava
+2.Project Reactor
+  Spring internally uses Project Reactor - webflex
+3.SmallRye Mutiny - Red hat developed lib
+
+1.Mutiny was built by Red hat team,relased under smallRye project
+2.Mutiny first integrated with Quarkus, later with Vertx.
+3.Mutiny is reactive stream certified
+4.Mutiny is the perfect companion to tame the async nature of apps with non blocking io.
+
+....................................................................................
+			 Core Concepts of Muntiny
+....................................................................................
+
+Publisher:
+  Object - Provider of data 
+  Who publish events
+Subscriber:
+  Object - Receiver of data
+  Who listens for events
+Subscription -
+   Object who conects Publisher and Subscriber in back end.
+Operators 
+   Are apis provided to process "stream of data"
+
+Events: - data,error,complete
+
+1.onItem -  onData - -> data event published by publisher when ever the data is available
+2.onFailure - onError - error event published by publisher when ever the error occurred.
+3.onComplete -  No more data /error published by publisher...
+
+
+Muntiny Publishers Types:
+
+1.Uni 
+  Emit o or 1 item
+  Mono in spring
+2.Multi 
+   1..to Many items - Stream
+ Flux in Spring
+
+
+Steps:
+1.create plain maven project and add mutiny dependency.
+
+1.create Publisher
+2.emits data or error events
+3.subscribe for data or error events.
+
+
+package com.ibm;
+
+import io.smallrye.mutiny.Uni;
+
+public class HelloMutiny {
+    public static void main(String[] args) {
+        //create Uni object and emit Hello data(stream) - as soon as data is emitted, the subscriber
+        //who has attached will receive data(event)
+        Uni.createFrom().item("Hello").subscribe().with(data->{
+            System.out.println(data);
+        });
+    }
+}
+
+Publisher and Subscriber:
+package com.ibm;
+
+import io.smallrye.mutiny.Uni;
+
+class Publisher {
+    public static Uni<String> publish() {
+        return Uni.createFrom().item("Hello");
+    }
+}
+
+public class PublisherAndSubscriber {
+    public static void main(String[] args) {
+     Publisher.publish().subscribe().with(System.out::println);
+    }
+}
+
+How to emit error Event
+
+package com.ibm;
+
+import io.smallrye.mutiny.Uni;
+
+public class ErrorEvent {
+    public static void main(String[] args) {
+        Uni.createFrom().failure(new RuntimeException("oops")).subscribe().with(data->{},err->{
+            System.out.println(err);
+        });
+    }
+}
+
+Biz logic with Uni:
+..................
+package com.ibm;
+
+import io.smallrye.mutiny.Uni;
+
+class Auth {
+
+    public  static  Uni auth(String name,String password){
+        if(name.equals("admin") && password.equals("admin")){
+            return Uni.createFrom().item("Login success");
+        }
+        return Uni.createFrom().item("Login failed");
+    }
+}
+
+public class Login {
+    public static void main(String[] args) {
+         Auth.auth("admin","admin").subscribe().with(System.out::println);
+        Auth.auth("foo","admin").subscribe().with(System.out::println);
+
+    }
+}
+....................................................................................
+			  Data Pipe lines
+...................................................................................
+
+package com.ibm;
+
+import io.smallrye.mutiny.Uni;
+
+import java.time.Duration;
+
+public class UniPipeDataPipeLine {
+    public static void main(String[] args) {
+        Uni.createFrom().item("hello")
+                .onItem().transform(data->data.toUpperCase())
+                .onItem().delayIt().by(Duration.ofMillis(10000))
+                .subscribe().with(System.out::println);
+    }
+}
+..................................................................................
+			 Multi - Streaming
+...................................................................................
+Flow of data  from producer to consumer/subscriber.
+
+package com.ibm;
+
+import io.smallrye.mutiny.Multi;
+
+public class MultiEvents {
+    public static void main(String[] args) {
+        Multi.createFrom()
+                .items(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+                .subscribe().with(System.out::println);
+    }
+}
+
+Collection of Data:
+...................
+package com.ibm;
+
+import io.smallrye.mutiny.Multi;
+
+import java.util.List;
+
+public class CollectionEvents {
+    public static void main(String[] args) {
+        List mylist = List.of(1, 2, 4, 56, 78);
+        Multi.createFrom().iterable(mylist).subscribe().with(System.out::println);
+    }
+}
+
+PipeLines-Multi
+package com.ibm;
+
+import io.smallrye.mutiny.Multi;
+
+public class MultiPipeLines {
+    public static void main(String[] args) {
+        Multi.createFrom()
+                .range(1,25)
+                .onItem().transform(data->data * 2)
+                .subscribe()
+                .with(System.out::println);
+    }
+}
+
+Filtering , selections:
+.......................
+package com.ibm;
+
+import io.smallrye.mutiny.Multi;
+
+public class MultiStreamProcessing {
+    public static void main(String[] args) {
+        Multi.createFrom().range(1, 390)
+                .filter(data -> data % 2 != 0)
+                .select().distinct()
+                .select().first(10)
+                .subscribe().with(System.out::println);
+    }
+}
+
+Error handling in gracefull manner:
+...................................
+package com.ibm;
+
+import io.smallrye.mutiny.Uni;
+
+public class ErrorHandling {
+    public static void main(String[] args) {
+        Uni.createFrom().failure(new RuntimeException("oops")).subscribe().with(data -> {
+        }, err -> {
+            System.out.println(err);
+        });
+
+        Uni.createFrom().failure(new RuntimeException("oops"))
+                .onFailure().recoverWithItem("fallback")
+                .subscribe().with(data -> {
+                    System.out.println(data);
+                });
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
