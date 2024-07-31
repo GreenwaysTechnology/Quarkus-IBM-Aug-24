@@ -1,8 +1,10 @@
 package com.ibm.rest.api.responses;
 
 import com.ibm.rest.api.payload.entity.User;
+import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
+import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
 @Path("login")
@@ -10,6 +12,7 @@ public class LoginResource {
 
     //login
     @POST
+    @Consumes(MediaType.APPLICATION_JSON)
     public Response login(User user) {
         if (user.getUserName().equals("admin") && user.getPassword().equals("admin")) {
             String jwtToken = "Abc23232323asfafd";
