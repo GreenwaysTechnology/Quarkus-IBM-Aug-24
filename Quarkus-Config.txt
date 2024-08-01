@@ -1,0 +1,467 @@
+		  Microservices/Distributed COnfigurations
+.....................................................................................
+
+Pattern: Cross Cutting Concerns
+
+The application may require some services which need not be part of application.
+
+Pattern: Microservice chassis:
+.............................
+When you start the development of an application you often spend a significant amount of time writing the build logic and putting in place the mechanisms to handle cross-cutting concerns
+
+Common CrossCutting Concerns:
+
+1.Configuration
+2.Security
+3.Logging
+4.Moniotoring- Health
+5.Metrics
+6.Tracing
+
+Microprofile config Specification:
+
+https://download.eclipse.org/microprofile/microprofile-config-3.0/microprofile-config-spec-3.0.html
+
+Quarkus uses "smallyRye MicroProfile Config" implementation.
+
+https://github.com/smallrye/smallrye-config
+
+		 	QuarkusApp
+			   |
+		  SmallRye Config Implementation
+			  |
+		   MicroProfile Config spec			
+			  |
+	         Externalized configuration Spec
+                         |
+		  Microservice -chassis Spec
+
+Core Concepts:
+
+1.Config Sources:
+   The place from where the configuration data is present.
+
+1.(400)-System Properties
+2.(300)-Environment variables
+3.(295)".env" File in the current working directory.
+4.(260)Quarkus application configuration file - $PWD/config/application.properties 
+5.(250)Quarkus application configuration file - src/resources/application.properties    in classpath
+6.(100)MicroProfile Config Configuration file META-INF/microprofile-config.properties   in class path
+7.Third party configurations
+   consul,kubernets,git,external webservers
+
+Configuration values are looked up based on "ordinal value" - Ordinal value.
+
+for i have config data called
+
+message ='hello'
+
+if it has defined in system properties and also env variables, when you read, you will get only system properties.
+
+ Properties are reterived from only highest ordinal value.
+
+"A configuration property lookup starts by the highest ordinal configuration source available and works it way down to other sources until a match is found".
+
+
+Types of configuration data:
+
+1.Application configuration data
+  Data configured by developer
+2.Quarkus framework configuration data
+  Data provided by quarkus framework
+   web related configuration,database related configuration,messaging related  configuration
+
+
+Syntax;
+key.key.key=value
+
+user.name='foo'
+quarkus.http.port=9090
+
+1.create project
+
+quarkus create app core-config
+
+
+
+configuration source:
+
+src/resources/application.properties
+greeting.message=Hello,Rest
+
+Configuration data can be read from Resources or Services
+
+package org.acme;
+
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.MediaType;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+
+@Path("/hello")
+public class GreetingResource {
+
+    @ConfigProperty(name = "greeting.message")
+    String message;
+    @GET
+    @Produces(MediaType.TEXT_PLAIN)
+    public String hello() {
+        return message;
+    }
+}
+..................................................................................
+		 What if the config property not present in the config file
+..................................................................................
+
+application.properties
+
+if no property found in any config source, the will throw exception.
+.quarkus.runtime.configuration.ConfigurationException: Failed to load config value of type class java.lang.String for: greeting.message
+
+	at io.quarkus.arc.runtime.ConfigRecorder.validateConfigProperties(ConfigRecorder.java:70)
+	at io.quarkus.deployment.steps.ConfigBuildStep$validateConfigValues1665125174.deploy_0(Unknown Source)
+	at io.quarkus.deployment.steps.ConfigBuildStep$validateConfigValues1665125174.deploy(Unknown Source)
+
+Solution:
+
+Default Property value
+
+package org.acme;
+
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.MediaType;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+
+@Path("/hello")
+public class GreetingResource {
+
+    @ConfigProperty(name = "greeting.message",defaultValue = "Welcome")
+    String message;
+    @GET
+    @Produces(MediaType.TEXT_PLAIN)
+    public String hello() {
+        return message;
+    }
+}
+
+...................................................................................
+....................................................................................
+		 Programmetic way of accessing configuration property
+...................................................................................
+
+Without annotation (@ConfigProperty) also we can access config property.
+
+ConfigProvider
+
+src/resources/application.properties
+greeting.message=Hello,Quarkus
+app.user.name=Subramanian
+
+package org.acme;
+
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.MediaType;
+import org.eclipse.microprofile.config.ConfigProvider;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+
+@Path("/hello")
+public class GreetingResource {
+
+    @ConfigProperty(name = "greeting.message", defaultValue = "Welcome")
+    String message;
+
+
+    @GET
+    @Produces(MediaType.TEXT_PLAIN)
+    public String hello() {
+        return message;
+    }
+
+    @GET
+    @Path("name")
+    public String getName() {
+        return ConfigProvider.getConfig()
+                .getOptionalValue("app.user.name", String.class).orElse("Sweety");
+
+    }
+}
+.....................................................................................
+			1.(400)-System Properties
+
+
+System Properties are supplied via commandline using flag -D.
+
+System Properties are supplied 
+ ->During dev mode
+ ->During prod mode
+
+Now , if you supply "greeting.message" property via System variables/properties, as Per Ordinal value system properties always takes highest priorty. So You will get System properties value only.
+
+
+package org.acme;
+
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.MediaType;
+import org.eclipse.microprofile.config.ConfigProvider;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+
+@Path("/hello")
+public class GreetingResource {
+
+    @ConfigProperty(name = "greeting.message", defaultValue = "Welcome")
+    String message;
+
+
+    @GET
+    @Produces(MediaType.TEXT_PLAIN)
+    public String hello() {
+        return message;
+    }
+
+    @GET
+    @Path("name")
+    public String getName() {
+        return ConfigProvider.getConfig()
+                .getOptionalValue("app.user.name", String.class).orElse("Sweety");
+
+    }
+}
+Dev Mode:
+
+quarkus dev -Dgreeting.message=Hello,FromSystem
+
+mvnw -Dgreeting.message=Hello,FromSystem compile quarkus:dev
+.....................................................................................
+			  2.(300)-Environment variables
+
+Reading config data from the "operating system env variables"
+
+Standalone os
+1.windows,linux,mac
+2.container os - docker
+
+There are many ways to set env variables...
+
+Permentaly we can inside os or temporaryly
+
+In windows 
+
+SET
+
+In Linux/Mac
+
+export
+
+Lab:
+ Open command prompt : windows
+>SET greeting.message=Hello Env
+
+After setting: Run the app
+>quarkus dev
+
+
+Response:
+Hello Env.
+
+..........................................................................................................................................................................
+			      .env File(295)
+.....................................................................................
+
+Adding env variales via command prompt using set or export or adding into system settings, it is very hard
+Once the application changes os, then we need to configure the system settings manually.
+
+".env" file is bridge between operating system env variables and application.
+
+What ever we sepecify inside ".env" file, will be added into operating system when your app boots...
+
+Where should we add env file?
+ 
+core-config
+ |
+.env
+
+.env file must contain variables which must be UPPERCASE
+
+
+GREETING_MESSAGE=Hello,From ENV FILE
+
+package org.acme;
+
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.MediaType;
+import org.eclipse.microprofile.config.ConfigProvider;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+
+@Path("/hello")
+public class GreetingResource {
+
+    @ConfigProperty(name="greeting.message",defaultValue = "Hey")
+    String message;
+    @GET
+    @Produces(MediaType.TEXT_PLAIN)
+    public String hello() {
+        return message;
+    }
+
+    @GET
+    @Path("name")
+    public String getName(){
+        return ConfigProvider.getConfig().getOptionalValue("app.user.name",String.class).orElse("Name");
+    }
+}
+
+Testing:
+http://localhost:8080/hello
+Hello From ENV FILE
+....................................................................................
+  (260)Quarkus application configuration file - $PWD/config/application.properties 
+..................................................................................
+
+You can store application configuration inside config/application.properties file.
+config folder must be present in the root dir of application.
+
+config-app
+  |
+  config
+    |
+    application.properties
+       greeting.message=Hello,From Config Folder application.properties
+
+package org.acme;
+
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.MediaType;
+import org.eclipse.microprofile.config.ConfigProvider;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+
+@Path("/hello")
+public class GreetingResource {
+
+    @ConfigProperty(name="greeting.message",defaultValue = "Hey")
+    String message;
+    @GET
+    @Produces(MediaType.TEXT_PLAIN)
+    public String hello() {
+        return message;
+    }
+
+    @GET
+    @Path("name")
+    public String getName(){
+        return ConfigProvider.getConfig().getOptionalValue("app.user.name",String.class).orElse("Name");
+    }
+}
+
+.....................................................................................
+			src/main/resources/application.properties -(250)
+.....................................................................................
+
+#configuration data
+greeting.message=Hello,How are You?
+app.user.name =Subramanian
+
+
+#configuration data
+greeting.message=Hello,How are You?
+app.user.name =Subramanian
+package org.acme;
+
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.MediaType;
+import org.eclipse.microprofile.config.ConfigProvider;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+
+@Path("/hello")
+public class GreetingResource {
+
+    @ConfigProperty(name = "greeting.message", defaultValue = "Welcome to Quarkus")
+    String message;
+
+    @GET
+    @Produces(MediaType.TEXT_PLAIN)
+    public String hello() {
+        return message;
+    }
+
+    @GET
+    @Path("name")
+    public String getName() {
+        return ConfigProvider.getConfig().getOptionalValue("app.user.name", String.class).orElse("Default Name");
+    }
+}
+.....................................................................................
+ (100)MicroProfile Config Configuration file META-INF/microprofile-config.properties                           in class path
+....................................................................................
+
+It has the lowest ordinal value when comapre to other configurations
+
+microprofile-config.properties
+  |
+ greeting.message=Hello,From MicroProfile Configuration
+
+package org.acme;
+
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.MediaType;
+import org.eclipse.microprofile.config.ConfigProvider;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+
+@Path("/hello")
+public class GreetingResource {
+
+    @ConfigProperty(name = "greeting.message", defaultValue = "Welcome")
+    String message;
+
+
+    @GET
+    @Produces(MediaType.TEXT_PLAIN)
+    public String hello() {
+        return message;
+    }
+
+    @GET
+    @Path("name")
+    public String getName() {
+        return ConfigProvider.getConfig()
+                .getOptionalValue("app.user.name", String.class).orElse("Sweety");
+
+    }
+}
+.....................................................................................
+			How property search begins
+.....................................................................................
+
+Flow
+    message.greeting
+
+   System Properties
+	|
+        Environment variables
+		|
+		.env File
+		   |
+		   config/application.properties
+		    |
+		    resources/application.properties
+			|
+			microprofile.properties
+			  |
+	  ConfigProperty(name = "greeting.message", defaultValue = "Default Message")
+			  |
+			   default value to be picked up
+....................................................................................
