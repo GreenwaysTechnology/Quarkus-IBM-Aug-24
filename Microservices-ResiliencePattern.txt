@@ -31,7 +31,7 @@ SmallRye Provides implementation via annotations.
 Quarkus uses that implementation.
 
 @Timeout - fail if the invocation takes too long
-@Rety -  Retry several times incase of a failure
+@Retry -  Retry several times incase of a failure
 @CircuitBreaker- Prvent Invocations if previous invocations failed too often
 @BulkHead - Limit Concurrent invocations.
 ....................................................................

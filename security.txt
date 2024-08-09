@@ -1,0 +1,1 @@
+https://github.com/gscaramuzzino/quarkus-jwt-auth/blob/main/amazon-cart/src/main/java/org/gs/AmazonCartResource.java
